@@ -1,0 +1,1952 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Simulador e Calculadora de Requisições API</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --ink: #14231c;
+      --muted: #4a5c52;
+      --line: #c9d5cd;
+      --paper: #f3f6f2;
+      --panel: rgba(255, 255, 255, 0.78);
+      --accent: #1f6b4a;
+      --accent-deep: #0f3d2c;
+      --warn: #8a5a10;
+      --warn-bg: #fff4df;
+      --ok: #1f6b4a;
+      --ok-bg: #e7f4ec;
+      --danger: #8b2e2e;
+      --danger-bg: #f8e8e8;
+      --shadow: 0 18px 50px rgba(20, 35, 28, 0.10);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: "Source Sans 3", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, #d9ebe1 0%, transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, #e7efe4 0%, transparent 50%),
+        linear-gradient(180deg, #eef3ee 0%, var(--paper) 40%, #e8eee9 100%);
+      min-height: 100vh;
+    }
+
+    .wrap {
+      width: min(1120px, calc(100% - 2rem));
+      margin: 0 auto;
+      padding: 2.5rem 0 4rem;
+    }
+
+    header.hero {
+      margin-bottom: 1.25rem;
+    }
+    header.hero .brand {
+      font-family: "Fraunces", serif;
+      font-size: clamp(1.85rem, 3.2vw, 2.55rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--accent-deep);
+      margin: 0 0 0.4rem;
+    }
+    header.hero p {
+      margin: 0;
+      max-width: 46rem;
+      color: var(--muted);
+      font-size: 1.05rem;
+      line-height: 1.55;
+    }
+
+    .app-nav {
+      display: flex;
+      gap: 0.4rem;
+      margin: 0 0 1.35rem;
+      padding: 0.35rem;
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(201, 213, 205, 0.95);
+      border-radius: 999px;
+      box-shadow: var(--shadow);
+      width: fit-content;
+      max-width: 100%;
+      flex-wrap: wrap;
+    }
+    .app-nav button {
+      background: transparent;
+      color: var(--muted);
+      padding: 0.65rem 1.15rem;
+      border-radius: 999px;
+      font-size: 0.95rem;
+    }
+    .app-nav button.active {
+      background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+      color: #fff;
+    }
+    .app-view { display: none; }
+    .app-view.active { display: block; }
+
+    .panel {
+      background: var(--panel);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(201, 213, 205, 0.9);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.25rem 1.35rem;
+    }
+    .panel h2 {
+      font-family: "Fraunces", serif;
+      font-size: 1.2rem;
+      margin: 0 0 0.85rem;
+      color: var(--accent-deep);
+    }
+
+    .drop {
+      border: 1.5px dashed #8aa595;
+      border-radius: 14px;
+      background: linear-gradient(180deg, #fbfdfb, #f0f6f2);
+      padding: 1.6rem 1.2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s, transform .15s;
+    }
+    .drop:hover, .drop.dragover {
+      border-color: var(--accent);
+      background: #eaf5ef;
+      transform: translateY(-1px);
+    }
+    .drop strong { display: block; font-size: 1.05rem; margin-bottom: 0.25rem; }
+    .drop span { color: var(--muted); font-size: 0.95rem; }
+    .drop input { display: none; }
+
+    .field {
+      margin-top: 1rem;
+      display: grid;
+      gap: 0.35rem;
+    }
+    .field label {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+      .field input[type="number"],
+    .field select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 0.7rem 0.85rem;
+      font: inherit;
+      background: #fff;
+      color: var(--ink);
+    }
+    .fields-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.85rem;
+      margin-top: 1rem;
+    }
+    @media (max-width: 640px) {
+      .fields-row { grid-template-columns: 1fr; }
+    }
+    .sim-box {
+      margin-top: 1rem;
+      padding: 0.95rem 1rem;
+      border-radius: 12px;
+      border: 1px solid #b7d4c4;
+      background: linear-gradient(180deg, #f7fbf8, #eef6f1);
+    }
+    .sim-box .sim-title {
+      font-family: "Fraunces", serif;
+      font-size: 1.05rem;
+      color: var(--accent-deep);
+      margin: 0 0 0.35rem;
+    }
+    .sim-box .fields-row { margin-top: 0.65rem; }
+    .hint {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin: 0.15rem 0 0;
+    }
+
+    .actions {
+      display: flex;
+      gap: 0.65rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+    button {
+      font: inherit;
+      font-weight: 600;
+      border: 0;
+      border-radius: 999px;
+      padding: 0.75rem 1.2rem;
+      cursor: pointer;
+      transition: transform .12s, opacity .12s;
+    }
+    button:active { transform: scale(0.98); }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+      color: #fff;
+    }
+    .btn-ghost {
+      background: #fff;
+      color: var(--accent-deep);
+      border: 1px solid var(--line);
+    }
+
+    .rules {
+      margin-top: 1rem;
+      display: grid;
+      gap: 0.45rem;
+      font-size: 0.92rem;
+      color: var(--muted);
+    }
+    .rules code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background: #e7eee9;
+      padding: 0.1rem 0.35rem;
+      border-radius: 6px;
+      color: var(--ink);
+      font-size: 0.85rem;
+    }
+
+    .status {
+      margin-top: 1rem;
+      padding: 0.85rem 1rem;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      display: none;
+    }
+    .status.show { display: block; }
+    .status.info { background: #e8eef8; color: #243552; }
+    .status.error { background: var(--danger-bg); color: var(--danger); }
+    .status.ok { background: var(--ok-bg); color: var(--ok); }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1.25rem;
+      background: rgba(10, 18, 14, 0.55);
+      backdrop-filter: blur(4px);
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      width: min(560px, 100%);
+      max-height: min(78vh, 640px);
+      display: flex;
+      flex-direction: column;
+      background: #fff;
+      color: var(--ink);
+      border-radius: 16px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+      overflow: hidden;
+      animation: modalIn 0.22s ease-out;
+    }
+    @keyframes modalIn {
+      from { opacity: 0; transform: translateY(10px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.95rem 1.1rem;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #f7fbf8, #fff);
+      flex-shrink: 0;
+    }
+    .modal-header h3 {
+      margin: 0;
+      font-family: "Fraunces", serif;
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--accent-deep);
+    }
+    .modal-close {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      width: 2.2rem;
+      height: 2.2rem;
+      padding: 0;
+      font-size: 1.25rem;
+      line-height: 1;
+      display: grid;
+      place-items: center;
+    }
+    .modal-close:hover { color: var(--ink); border-color: #9eb3a6; }
+    .modal-body {
+      margin: 0;
+      padding: 1.2rem 1.25rem 1.4rem;
+      overflow: auto;
+      white-space: pre-wrap;
+      line-height: 1.6;
+      font-family: "Source Sans 3", sans-serif;
+      font-size: 1rem;
+      color: var(--ink);
+    }
+    body.modal-open { overflow: hidden; }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.7rem;
+      margin-top: 1rem;
+    }
+    @media (max-width: 560px) {
+      .metrics { grid-template-columns: 1fr; }
+    }
+    .metric {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0.85rem 0.95rem;
+    }
+    .metric .label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .metric .value {
+      font-family: "Fraunces", serif;
+      font-size: 1.35rem;
+      margin-top: 0.2rem;
+      color: var(--accent-deep);
+    }
+    .metric .sub {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 0.15rem;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 0.4rem;
+      margin: 0.2rem 0 0.9rem;
+      background: #e5eee8;
+      padding: 0.3rem;
+      border-radius: 999px;
+      width: fit-content;
+    }
+    .tabs button {
+      background: transparent;
+      color: var(--muted);
+      padding: 0.45rem 0.95rem;
+      border-radius: 999px;
+      font-size: 0.92rem;
+    }
+    .tabs button.active {
+      background: #fff;
+      color: var(--accent-deep);
+      box-shadow: 0 2px 8px rgba(20, 35, 28, 0.08);
+    }
+
+    .price-view { display: none; }
+    .price-view.active { display: block; }
+
+    table.price {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.92rem;
+    }
+    table.price th,
+    table.price td {
+      text-align: left;
+      padding: 0.55rem 0.4rem;
+      border-bottom: 1px solid var(--line);
+    }
+    table.price th {
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    table.price tr.hl td {
+      background: var(--ok-bg);
+      font-weight: 600;
+    }
+
+    .cost-card {
+      margin-top: 0.9rem;
+      border-radius: 12px;
+      padding: 0.95rem 1rem;
+      background: linear-gradient(135deg, #e8f5ee, #f7fbf8);
+      border: 1px solid #b7d4c4;
+    }
+    .cost-card .title {
+      font-weight: 700;
+      color: var(--accent-deep);
+      margin-bottom: 0.35rem;
+    }
+    .cost-card .big {
+      font-family: "Fraunces", serif;
+      font-size: 1.7rem;
+      color: var(--accent-deep);
+    }
+    .cost-card ul {
+      margin: 0.55rem 0 0;
+      padding-left: 1.1rem;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .batches {
+      margin-top: 0.35rem;
+      overflow: auto;
+      max-height: 280px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+    }
+    .batches .btn-dl {
+      border-radius: 999px;
+      padding: 0.35rem 0.75rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+      background: #fff;
+      color: var(--accent-deep);
+      border: 1px solid var(--line);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .batches .btn-dl:hover {
+      border-color: var(--accent);
+      background: #eaf5ef;
+    }
+    .batch-actions {
+      display: flex;
+      gap: 0.55rem;
+      flex-wrap: wrap;
+      margin: 0.55rem 0 0.7rem;
+    }
+    .revenue-table-wrap {
+      overflow: auto;
+      max-height: 480px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+      margin-top: 0.7rem;
+    }
+    table.revenue {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+    table.revenue th,
+    table.revenue td {
+      padding: 0.55rem 0.7rem;
+      border-bottom: 1px solid #e4ebe6;
+      text-align: left;
+      white-space: nowrap;
+    }
+    table.revenue th {
+      position: sticky;
+      top: 0;
+      background: #f4f8f5;
+      color: var(--muted);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      z-index: 1;
+    }
+    table.revenue td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    table.revenue tr.total td {
+      font-weight: 700;
+      background: #e7f4ec;
+      border-top: 2px solid #b7d4c4;
+    }
+    table.revenue tr.client-row { cursor: pointer; }
+    table.revenue tr.client-row:hover { background: #f3faf6; }
+    table.revenue tr.client-row.open { background: #e7f4ec; }
+    table.revenue tr.client-row .client-name {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    table.revenue tr.client-row .chev {
+      display: inline-block;
+      width: 1rem;
+      color: var(--accent);
+      transition: transform .15s;
+    }
+    table.revenue tr.client-row.open .chev { transform: rotate(90deg); }
+    table.revenue tr.month-row td { background: #f7fbf8; color: var(--ink); font-size: 0.86rem; }
+    table.revenue tr.month-row td:first-child { padding-left: 1.8rem; }
+    table.revenue tr.month-total td {
+      background: #eef6f1;
+      font-weight: 600;
+      font-size: 0.86rem;
+    }
+    table.revenue tr.month-total td:first-child { padding-left: 1.8rem; }
+    .pill {
+      display: inline-block;
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      background: #e7eee9;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--accent-deep);
+    }
+    .batches table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+    .batches th, .batches td {
+      padding: 0.5rem 0.7rem;
+      border-bottom: 1px solid #e4ebe6;
+      text-align: left;
+    }
+    .batches th {
+      position: sticky;
+      top: 0;
+      background: #f4f8f5;
+      color: var(--muted);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    footer.note {
+      margin-top: 1.4rem;
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <h1 class="brand" id="appBrand">Simulador de Consumo da API</h1>
+      <p id="appSubtitle">
+        Analise um arquivo <strong>DOCX</strong> como a API faria e estime o custo nos modelos pré-pago, pós-pago, jornal e HTML.
+      </p>
+    </header>
+
+    <nav class="app-nav" role="tablist" aria-label="Seções do aplicativo">
+      <button type="button" class="active" data-app-tab="consumo" role="tab" aria-selected="true">Simulador de Consumo da API</button>
+      <button type="button" data-app-tab="calculadora" role="tab" aria-selected="false">Calculadora de Requisições</button>
+    </nav>
+
+    <!-- ===================== ABA: SIMULADOR DE CONSUMO ===================== -->
+    <div class="app-view active" id="view-consumo" role="tabpanel">
+      <section class="panel">
+        <h2>1. Enviar documento</h2>
+
+        <div class="drop" id="dropzone" role="button" tabindex="0" aria-label="Selecionar arquivo DOCX">
+          <strong>Arraste o arquivo DOCX aqui</strong>
+          <span>ou clique para selecionar · apenas .docx</span>
+          <input type="file" id="fileInput" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+        </div>
+
+        <div class="field">
+          <label for="frequency">Frequência de envio</label>
+          <select id="frequency">
+            <option value="1">Único (apenas este arquivo)</option>
+            <option value="30" selected>Diário (30 envios/mês)</option>
+            <option value="22">Dias úteis (22 envios/mês)</option>
+            <option value="4">Semanal (4 envios/mês)</option>
+          </select>
+          <p class="hint">Usado para projetar o consumo mensal do cliente.</p>
+        </div>
+
+        <div class="sim-box">
+          <h3 class="sim-title">Simulação de preços (jornal e HTML)</h3>
+          <p class="hint" style="margin:0">Ajuste os valores unitários para recalcular os dois formatos sem reenviar o arquivo.</p>
+          <div class="fields-row">
+            <div class="field" style="margin-top:0">
+              <label for="priceCmCol">Valor por cm × coluna (R$)</label>
+              <input type="number" id="priceCmCol" min="0" step="0.01" value="70" />
+            </div>
+            <div class="field" style="margin-top:0">
+              <label for="priceByte">Valor por byte do HTML (R$)</label>
+              <input type="number" id="priceByte" min="0" step="0.01" value="0.25" />
+            </div>
+          </div>
+          <div class="actions" style="margin-top:0.85rem">
+            <button class="btn-ghost" id="resetPricesBtn" type="button">Restaurar valores padrão</button>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn-primary" id="analyzeBtn" disabled>Analisar e simular custos</button>
+          <button class="btn-ghost" id="clearBtn" type="button">Limpar</button>
+          <button class="btn-ghost" id="showMessageBtn" type="button" hidden>Ver mensagem ao cliente</button>
+        </div>
+
+        <div class="rules">
+          <div>• Limite técnico: <code>700 KB</code> por requisição</div>
+          <div>• Estrutura: tabelas com no máximo <code>800</code> linhas de dados (+ cabeçalho)</div>
+          <div>• O tamanho do .docx compactado <strong>não</strong> é o tamanho da requisição — a API processa o HTML gerado</div>
+        </div>
+
+        <div class="status" id="status"></div>
+      </section>
+
+      <section class="panel" style="margin-top: 1.1rem;" id="resultsPanel" hidden>
+        <h2>2. Resultado da análise</h2>
+        <div class="metrics" id="metrics"></div>
+
+        <div style="margin-top: 1.25rem;">
+          <h2 style="margin-bottom: 0.5rem;">3. Custos estimados</h2>
+          <div class="tabs" role="tablist">
+            <button type="button" class="active" data-tab="pos">Pós-pago</button>
+            <button type="button" data-tab="pre">Pré-pago</button>
+            <button type="button" data-tab="jornal">Jornal (cm×coluna)</button>
+            <button type="button" data-tab="byte">HTML (byte)</button>
+            <button type="button" data-tab="cmp">Comparativo</button>
+          </div>
+
+          <div class="price-view active" id="view-pos">
+            <table class="price" id="tablePos"></table>
+            <div class="cost-card" id="costPos"></div>
+          </div>
+
+          <div class="price-view" id="view-pre">
+            <table class="price" id="tablePre"></table>
+            <div class="cost-card" id="costPre"></div>
+          </div>
+
+          <div class="price-view" id="view-jornal">
+            <div class="cost-card" id="costJornal"></div>
+          </div>
+
+          <div class="price-view" id="view-byte">
+            <div class="cost-card" id="costByte"></div>
+          </div>
+
+          <div class="price-view" id="view-cmp">
+            <div class="cost-card" id="costCmp"></div>
+          </div>
+        </div>
+
+        <div style="margin-top: 1.25rem;" id="batchesSection" hidden>
+          <h2>4. Lotes de requisição</h2>
+          <p class="hint" style="margin-bottom: 0.55rem;">Cada linha representa uma chamada à API. Baixe o HTML de cada lote para avaliar o conteúdo enviado.</p>
+          <div class="batch-actions">
+            <button type="button" class="btn-ghost" id="downloadAllBatchesBtn" hidden>Baixar todos os lotes (.zip)</button>
+          </div>
+          <div class="batches">
+            <table>
+              <thead>
+                <tr>
+                  <th>Requisição</th>
+                  <th>Tabelas</th>
+                  <th>Linhas (c/ cabeçalho)</th>
+                  <th>Tamanho do payload</th>
+                  <th>Status</th>
+                  <th>Arquivo</th>
+                </tr>
+              </thead>
+              <tbody id="batchesBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ===================== ABA: CALCULADORA DE REQUISIÇÕES / FATURAMENTO ===================== -->
+    <div class="app-view" id="view-calculadora" role="tabpanel">
+      <section class="panel">
+        <h2>1. Relatório de utilização (Publicações por origem)</h2>
+        <p class="hint" style="margin-top:0">
+          Calcula o faturamento estimado por cliente/origem nos modelos <strong>pré-pago</strong> e <strong>pós-pago</strong>,
+          com base na quantidade de requisições do relatório mensal.
+        </p>
+
+        <div class="drop" id="dropzoneReport" role="button" tabindex="0" aria-label="Selecionar planilha de utilização">
+          <strong>Arraste a planilha aqui</strong>
+          <span>ou clique para selecionar · .xlsx / .csv · padrão já carregado: Publicações por origem 20260904</span>
+          <input type="file" id="fileInputReport" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" />
+        </div>
+
+        <div class="rules">
+          <div>• <strong>Pós-pago:</strong> faixa de preço do mês aplicada sobre todas as requisições daquele mês</div>
+          <div>• <strong>Pré-pago:</strong> pacotes necessários para cobrir o consumo de cada mês</div>
+          <div>• Colunas esperadas: <code>Ano</code>, <code>Mes</code>, <code>Origem</code>, <code>Qtde</code></div>
+        </div>
+
+        <div class="actions">
+          <button class="btn-primary" id="calcRevenueBtn" type="button">Calcular faturamento</button>
+          <button class="btn-ghost" id="reloadDefaultReportBtn" type="button">Recarregar relatório padrão</button>
+        </div>
+
+        <div class="status" id="statusCalc"></div>
+      </section>
+
+      <section class="panel" style="margin-top: 1.1rem;" id="calcResultsPanel" hidden>
+        <h2>2. Faturamento estimado</h2>
+        <div class="metrics" id="metricsCalc"></div>
+
+        <div style="margin-top: 1.1rem;" class="fields-row">
+          <div class="cost-card">
+            <div class="title">Pós-pago · Por uso</div>
+            <div class="big" id="totalPosRevenue">R$ 0,00</div>
+            <ul>
+              <li>Preço da faixa do volume mensal × requisições do mês</li>
+              <li id="posHint">—</li>
+            </ul>
+          </div>
+          <div class="cost-card">
+            <div class="title">Pré-pago · Pacotes</div>
+            <div class="big" id="totalPreRevenue">R$ 0,00</div>
+            <ul>
+              <li>Pacotes suficientes para cobrir o consumo de cada mês</li>
+              <li id="preHint">—</li>
+            </ul>
+          </div>
+        </div>
+
+        <div style="margin-top: 1.25rem;">
+          <h2 style="margin-bottom: 0.35rem;">3. Por cliente / origem</h2>
+          <p class="hint">Clique no nome do cliente para expandir o detalhe mês a mês (requisições e valores pré/pós-pago).</p>
+          <div class="revenue-table-wrap">
+            <table class="revenue" id="revenueByClient">
+              <thead>
+                <tr>
+                  <th>Cliente / origem</th>
+                  <th>Meses</th>
+                  <th>Requisições</th>
+                  <th>Pós-pago</th>
+                  <th>Pré-pago</th>
+                  <th>Diferença</th>
+                </tr>
+              </thead>
+              <tbody id="revenueByClientBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style="margin-top: 1.25rem;" id="revenueDetailPanel" hidden>
+          <h2 style="margin-bottom: 0.35rem;">4. Detalhe mensal — <span id="revenueDetailTitle"></span></h2>
+          <div class="revenue-table-wrap">
+            <table class="revenue" id="revenueDetail">
+              <thead>
+                <tr>
+                  <th>Mês</th>
+                  <th>Requisições</th>
+                  <th>Faixa pós-pago</th>
+                  <th>Pós-pago</th>
+                  <th>Pacotes pré-pago</th>
+                  <th>Pré-pago</th>
+                </tr>
+              </thead>
+              <tbody id="revenueDetailBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal-overlay" id="messageModal" role="dialog" aria-modal="true" aria-labelledby="messageModalTitle" hidden>
+      <div class="modal">
+        <div class="modal-header">
+          <h3 id="messageModalTitle">Mensagem ao cliente</h3>
+          <button type="button" class="modal-close" id="closeModalBtn" aria-label="Fechar">×</button>
+        </div>
+        <pre class="modal-body" id="apiMessage"></pre>
+      </div>
+    </div>
+
+    <footer class="note">
+      Processamento local no navegador — os arquivos não são enviados a nenhum servidor.
+      O <strong>Simulador</strong> estima custos a partir de DOCX; a <strong>Calculadora</strong> estima faturamento pré/pós-pago a partir do relatório Publicações por origem.
+    </footer>
+  </div>
+
+  <script>
+    const LIMIT_KB = 700;
+    const LIMIT_BYTES = LIMIT_KB * 1024;
+    const MAX_DATA_ROWS = 800;
+    const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+
+    const POS_TIERS = [
+      { min: 1, max: 500, price: 1.12, label: "1 a 500 requisições" },
+      { min: 501, max: 800, price: 1.02, label: "501 a 800 requisições" },
+      { min: 801, max: 1000, price: 0.94, label: "801 a 1.000 requisições" },
+      { min: 1001, max: 3000, price: 0.82, label: "1.001 a 3.000 requisições" },
+      { min: 3001, max: 5000, price: 0.70, label: "3.001 a 5.000 requisições" },
+      { min: 5001, max: Infinity, price: 0.58, label: "Acima de 5.000 requisições" },
+    ];
+
+    const PRE_PACKAGES = [
+      { requests: 500, price: 562 },
+      { requests: 800, price: 814 },
+      { requests: 1000, price: 935 },
+      { requests: 3000, price: 2450 },
+      { requests: 5000, price: 3491 },
+    ];
+
+    // Valores padrão da simulação (editáveis na tela)
+    const DEFAULT_USAGE_REPORT = {"fonte": "Publicacoes por origem 20260904.xlsx", "linhas": [{"ano": 2026, "mes": 1, "origem": "Plataforma.SP", "qtde": 423}, {"ano": 2026, "mes": 1, "origem": "Prodesp.Marketplace", "qtde": 5431}, {"ano": 2026, "mes": 1, "origem": "Publicante", "qtde": 23353}, {"ano": 2026, "mes": 1, "origem": "SEI", "qtde": 23216}, {"ano": 2026, "mes": 1, "origem": "sggd.detran.portal-credenciados", "qtde": 1869}, {"ano": 2026, "mes": 2, "origem": "Plataforma.SP", "qtde": 343}, {"ano": 2026, "mes": 2, "origem": "Prodesp.Marketplace", "qtde": 5570}, {"ano": 2026, "mes": 2, "origem": "Publicante", "qtde": 24986}, {"ano": 2026, "mes": 2, "origem": "SEI", "qtde": 31983}, {"ano": 2026, "mes": 2, "origem": "sggd.detran.portal-credenciados", "qtde": 2757}, {"ano": 2026, "mes": 3, "origem": "Plataforma.SP", "qtde": 1095}, {"ano": 2026, "mes": 3, "origem": "Prodesp.Marketplace", "qtde": 7611}, {"ano": 2026, "mes": 3, "origem": "Publicante", "qtde": 34383}, {"ano": 2026, "mes": 3, "origem": "SEI", "qtde": 34043}, {"ano": 2026, "mes": 3, "origem": "sggd.detran.portal-credenciados", "qtde": 2970}, {"ano": 2026, "mes": 4, "origem": "Plataforma.SP", "qtde": 1910}, {"ano": 2026, "mes": 4, "origem": "Prodesp.Marketplace", "qtde": 6707}, {"ano": 2026, "mes": 4, "origem": "Publicante", "qtde": 30010}, {"ano": 2026, "mes": 4, "origem": "SEI", "qtde": 30880}, {"ano": 2026, "mes": 4, "origem": "sggd.detran.portal-credenciados", "qtde": 532}, {"ano": 2026, "mes": 5, "origem": "Plataforma.SP", "qtde": 2928}, {"ano": 2026, "mes": 5, "origem": "Prodesp.Marketplace", "qtde": 7029}, {"ano": 2026, "mes": 5, "origem": "Publicante", "qtde": 31176}, {"ano": 2026, "mes": 5, "origem": "SEI", "qtde": 30303}, {"ano": 2026, "mes": 5, "origem": "sggd.detran.portal-credenciados", "qtde": 629}, {"ano": 2026, "mes": 6, "origem": "Plataforma.SP", "qtde": 3718}, {"ano": 2026, "mes": 6, "origem": "Procon SP Digital", "qtde": 24}, {"ano": 2026, "mes": 6, "origem": "Prodesp.Marketplace", "qtde": 6615}, {"ano": 2026, "mes": 6, "origem": "Publicante", "qtde": 31498}, {"ano": 2026, "mes": 6, "origem": "SEI", "qtde": 30908}, {"ano": 2026, "mes": 6, "origem": "sggd.detran.portal-credenciados", "qtde": 763}, {"ano": 2026, "mes": 7, "origem": "Plataforma.SP", "qtde": 3401}, {"ano": 2026, "mes": 7, "origem": "Procon SP Digital", "qtde": 368}, {"ano": 2026, "mes": 7, "origem": "Prodesp.Marketplace", "qtde": 6654}, {"ano": 2026, "mes": 7, "origem": "Publicante", "qtde": 27670}, {"ano": 2026, "mes": 7, "origem": "SEI", "qtde": 27473}, {"ano": 2026, "mes": 7, "origem": "sggd.detran.portal-credenciados", "qtde": 545}, {"ano": 2026, "mes": 8, "origem": "Plataforma.SP", "qtde": 4782}, {"ano": 2026, "mes": 8, "origem": "Procon SP Digital", "qtde": 441}, {"ano": 2026, "mes": 8, "origem": "Prodesp.Marketplace", "qtde": 6597}, {"ano": 2026, "mes": 8, "origem": "Publicante", "qtde": 29171}, {"ano": 2026, "mes": 8, "origem": "SEI", "qtde": 31324}, {"ano": 2026, "mes": 8, "origem": "sggd.detran.portal-credenciados", "qtde": 1369}]};
+
+    const DEFAULT_PRICE_CM_COL = 70;
+    const DEFAULT_PRICE_BYTE = 0.25;
+
+    // Cobrança em jornal / DOE: altura (cm) × nº de colunas
+    const NEWSPAPER_COLUMNS = 3; // tabela larga → 25,2 cm (3 × 8,1 cm)
+    const NEWSPAPER_LEADING_PT = 8; // entrelinhamento mínimo (normas)
+    const NEWSPAPER_CM_PER_LINE = (NEWSPAPER_LEADING_PT / 72) * 2.54; // ≈ 0,282 cm
+    const NEWSPAPER_PAGE_HEIGHT_CM = 40; // altura útil de referência (formato máx. 25,2 × 40 cm)
+    const NEWSPAPER_CM_COL_PER_PAGE = NEWSPAPER_PAGE_HEIGHT_CM * NEWSPAPER_COLUMNS; // 120
+
+    const INTRO_HTML = [
+      "<p>Nesse trecho será preenchido a breve descrição</p>",
+      "<p>Utilizar html, por exemplo <b>negrito</b> ou <i>itálico</i> sem nenhum tipo de estilização.<p/>",
+      "<p>A aplicação do DOE aplicará a estilização necessária</p>",
+      "<p>&nbsp</p>",
+    ].join("\n");
+
+    let selectedFile = null;
+    let lastResult = null;
+
+    const dropzone = document.getElementById("dropzone");
+    const fileInput = document.getElementById("fileInput");
+    const analyzeBtn = document.getElementById("analyzeBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const statusEl = document.getElementById("status");
+    const statusCalcEl = document.getElementById("statusCalc");
+    const frequencyEl = document.getElementById("frequency");
+    const priceCmColEl = document.getElementById("priceCmCol");
+    const priceByteEl = document.getElementById("priceByte");
+    const resetPricesBtn = document.getElementById("resetPricesBtn");
+    const apiMessage = document.getElementById("apiMessage");
+    const resultsPanel = document.getElementById("resultsPanel");
+    const batchesSection = document.getElementById("batchesSection");
+    const calcResultsPanel = document.getElementById("calcResultsPanel");
+    const messageModal = document.getElementById("messageModal");
+    const closeModalBtn = document.getElementById("closeModalBtn");
+    const showMessageBtn = document.getElementById("showMessageBtn");
+    const appBrand = document.getElementById("appBrand");
+    const appSubtitle = document.getElementById("appSubtitle");
+    const dropzoneReport = document.getElementById("dropzoneReport");
+    const fileInputReport = document.getElementById("fileInputReport");
+    const calcRevenueBtn = document.getElementById("calcRevenueBtn");
+    const reloadDefaultReportBtn = document.getElementById("reloadDefaultReportBtn");
+    let lastApiMessage = "";
+    let usageRows = [...DEFAULT_USAGE_REPORT.linhas];
+    let usageSourceName = DEFAULT_USAGE_REPORT.fonte;
+    let lastRevenueResult = null;
+
+    const APP_COPY = {
+      consumo: {
+        brand: "Simulador de Consumo da API",
+        subtitle:
+          "Analise um arquivo <strong>DOCX</strong> como a API faria e estime o custo nos modelos pré-pago, pós-pago, jornal e HTML.",
+      },
+      calculadora: {
+        brand: "Calculadora de Requisições",
+        subtitle:
+          "Estime o faturamento por cliente com o relatório <strong>Publicações por origem</strong>, nos modelos pré-pago (pacotes) e pós-pago (por uso).",
+      },
+    };
+
+    function getSimulationPrices() {
+      const cmCol = Number(String(priceCmColEl.value).replace(",", "."));
+      const byte = Number(String(priceByteEl.value).replace(",", "."));
+      return {
+        priceCmCol: Number.isFinite(cmCol) && cmCol >= 0 ? cmCol : DEFAULT_PRICE_CM_COL,
+        priceByte: Number.isFinite(byte) && byte >= 0 ? byte : DEFAULT_PRICE_BYTE,
+      };
+    }
+
+    function setSimulationPrices(priceCmCol, priceByte) {
+      priceCmColEl.value = String(priceCmCol);
+      priceByteEl.value = String(priceByte);
+    }
+
+    function openMessageModal(text) {
+      if (typeof text === "string") {
+        lastApiMessage = text;
+        apiMessage.textContent = text;
+      } else if (lastApiMessage) {
+        apiMessage.textContent = lastApiMessage;
+      }
+      messageModal.hidden = false;
+      messageModal.classList.add("open");
+      document.body.classList.add("modal-open");
+      closeModalBtn.focus();
+    }
+
+    function closeMessageModal() {
+      messageModal.classList.remove("open");
+      messageModal.hidden = true;
+      document.body.classList.remove("modal-open");
+    }
+
+    function money(v) {
+      return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    }
+
+    function formatBytes(bytes) {
+      const kb = bytes / 1024;
+      if (kb < 1024) return `${kb.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} KB`;
+      return `${(kb / 1024).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} MB`;
+    }
+
+    function setStatus(type, text, target = "both") {
+      const map = { consumo: [statusEl], calculadora: [statusCalcEl], both: [statusEl, statusCalcEl] };
+      (map[target] || map.both).forEach((el) => {
+        if (!el) return;
+        el.className = `status show ${type}`;
+        el.textContent = text;
+      });
+    }
+
+    function clearStatus() {
+      [statusEl, statusCalcEl].forEach((el) => {
+        if (!el) return;
+        el.className = "status";
+        el.textContent = "";
+      });
+    }
+
+    function switchAppTab(tabId) {
+      document.querySelectorAll(".app-nav button").forEach((btn) => {
+        const active = btn.dataset.appTab === tabId;
+        btn.classList.toggle("active", active);
+        btn.setAttribute("aria-selected", active ? "true" : "false");
+      });
+      document.querySelectorAll(".app-view").forEach((view) => {
+        view.classList.toggle("active", view.id === `view-${tabId}`);
+      });
+      const copy = APP_COPY[tabId] || APP_COPY.consumo;
+      appBrand.textContent = copy.brand;
+      appSubtitle.innerHTML = copy.subtitle;
+    }
+
+    function syncAnalyzeButtons() {
+      analyzeBtn.disabled = !selectedFile;
+    }
+
+    function utf8Bytes(str) {
+      return new TextEncoder().encode(str).length;
+    }
+
+    function escapeHtml(text) {
+      return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function cellText(tc) {
+      const texts = tc.getElementsByTagNameNS(W_NS, "t");
+      let out = "";
+      for (let i = 0; i < texts.length; i++) out += texts[i].textContent || "";
+      return out.trim();
+    }
+
+    function extractTablesFromDocxXml(xmlText) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(xmlText, "application/xml");
+      if (doc.getElementsByTagName("parsererror").length) {
+        throw new Error("Não foi possível ler o XML interno do DOCX.");
+      }
+
+      const tables = doc.getElementsByTagNameNS(W_NS, "tbl");
+      const extracted = [];
+
+      for (let t = 0; t < tables.length; t++) {
+        const rows = tables[t].getElementsByTagNameNS(W_NS, "tr");
+        const matrix = [];
+        for (let r = 0; r < rows.length; r++) {
+          const cells = rows[r].getElementsByTagNameNS(W_NS, "tc");
+          const row = [];
+          for (let c = 0; c < cells.length; c++) row.push(cellText(cells[c]));
+          if (row.length) matrix.push(row);
+        }
+        if (matrix.length) extracted.push(matrix);
+      }
+
+      return extracted;
+    }
+
+    function normalizeTables(rawTables) {
+      // Une todas as tabelas do DOCX em uma grade lógica (cabeçalho da primeira + dados)
+      if (!rawTables.length) return { header: ["Coluna 1"], dataRows: [] };
+
+      const first = rawTables[0];
+      const header = first[0] && first[0].length ? first[0] : ["Coluna 1"];
+      const dataRows = [];
+
+      for (let i = 0; i < rawTables.length; i++) {
+        const table = rawTables[i];
+        const start = i === 0 ? 1 : 0;
+        for (let r = start; r < table.length; r++) {
+          // Ignora linhas que são só repetição de cabeçalho
+          const isHeaderClone =
+            table[r].length === header.length &&
+            table[r].every((v, idx) => v === header[idx]);
+          if (!isHeaderClone) dataRows.push(table[r]);
+        }
+      }
+
+      return { header, dataRows };
+    }
+
+    function buildHtmlTable(header, dataChunk) {
+      const head = header
+        .map((h) => `<th>\n<b>${escapeHtml(h)}</b>\n</th>`)
+        .join("\n");
+      const body = dataChunk
+        .map((row) => {
+          const cells = header
+            .map((_, idx) => `<td>${escapeHtml(row[idx] ?? "")}</td>`)
+            .join("\n");
+          return `<tr>\n${cells}\n</tr>`;
+        })
+        .join("\n");
+
+      return [
+        "<table>",
+        "<thead>",
+        "<tr>",
+        head,
+        "</tr>",
+        "</thead>",
+        "<tbody>",
+        body,
+        "</tbody>",
+        "</table>",
+      ].join("\n");
+    }
+
+    function splitIntoApiTables(header, dataRows) {
+      const chunks = [];
+      for (let i = 0; i < dataRows.length; i += MAX_DATA_ROWS) {
+        const slice = dataRows.slice(i, i + MAX_DATA_ROWS);
+        const html = buildHtmlTable(header, slice);
+        chunks.push({
+          index: chunks.length + 1,
+          dataRows: slice.length,
+          totalTr: slice.length + 1,
+          html,
+          bytes: utf8Bytes(html),
+        });
+      }
+      return chunks;
+    }
+
+    function packRequests(tableChunks) {
+      const requests = [];
+      let current = null;
+
+      for (const chunk of tableChunks) {
+        if (!current) {
+          current = {
+            tables: [],
+            bytes: utf8Bytes(INTRO_HTML) + 1,
+            totalTr: 0,
+          };
+        }
+
+        // Se uma única tabela já passa de 700KB, vai sozinha (alerta)
+        if (current.tables.length > 0 && current.bytes + chunk.bytes > LIMIT_BYTES) {
+          requests.push(finalizeRequest(current, requests.length + 1));
+          current = {
+            tables: [],
+            bytes: utf8Bytes(INTRO_HTML) + 1,
+            totalTr: 0,
+          };
+        }
+
+        current.tables.push(chunk);
+        current.bytes += chunk.bytes;
+        current.totalTr += chunk.totalTr;
+      }
+
+      if (current && current.tables.length) {
+        requests.push(finalizeRequest(current, requests.length + 1));
+      }
+
+      return requests;
+    }
+
+    function finalizeRequest(current, id) {
+      const htmlParts = [INTRO_HTML, ...current.tables.map((t) => t.html)];
+      const payload = htmlParts.join("\n");
+      const bytes = utf8Bytes(payload);
+      return {
+        id,
+        tableCount: current.tables.length,
+        totalTr: current.totalTr,
+        bytes,
+        overLimit: bytes > LIMIT_BYTES,
+        tableIndexes: current.tables.map((t) => t.index),
+        payload,
+        fileName: `lote_${String(id).padStart(2, "0")}.html`,
+      };
+    }
+
+    function sanitizeBaseName(name) {
+      return String(name || "documento")
+        .replace(/\.docx$/i, "")
+        .replace(/[^\w\-À-ÿ]+/g, "_")
+        .replace(/_+/g, "_")
+        .slice(0, 60) || "documento";
+    }
+
+    function buildBatchFileName(baseName, requestId) {
+      return `${sanitizeBaseName(baseName)}_lote_${String(requestId).padStart(2, "0")}.html`;
+    }
+
+    function downloadTextFile(fileName, content, mime = "text/html;charset=utf-8") {
+      const blob = new Blob([content], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    }
+
+    async function downloadAllBatchFiles(ctx) {
+      if (!ctx?.requests?.length) return;
+      const zip = new JSZip();
+      const folder = zip.folder(sanitizeBaseName(ctx.fileName) + "_lotes");
+      ctx.requests.forEach((r) => {
+        const name = buildBatchFileName(ctx.fileName, r.id);
+        folder.file(name, r.payload || "");
+      });
+      const blob = await zip.generateAsync({ type: "blob" });
+      const zipName = `${sanitizeBaseName(ctx.fileName)}_lotes.zip`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = zipName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    }
+
+    function getPosTier(qty) {
+      if (qty <= 0) return POS_TIERS[0];
+      return POS_TIERS.find((t) => qty >= t.min && qty <= t.max) || POS_TIERS[POS_TIERS.length - 1];
+    }
+
+    function estimateNewspaper(tableChunks, freq, priceCmCol) {
+      // Cada tabela impressa: 1 linha de cabeçalho + N linhas de dados
+      // Altura cobrada por bloco = ceil(linhas × cm/linha); cm×coluna = altura × colunas
+      let heightExact = 0;
+      let heightBilled = 0;
+      let cmColuna = 0;
+      const unitPrice = priceCmCol;
+
+      tableChunks.forEach((chunk) => {
+        const lines = chunk.totalTr; // cabeçalho + dados
+        const exact = lines * NEWSPAPER_CM_PER_LINE;
+        const billed = Math.ceil(exact); // regra: 20,1 cm → 21 cm
+        heightExact += exact;
+        heightBilled += billed;
+        cmColuna += billed * NEWSPAPER_COLUMNS;
+      });
+
+      const cost = cmColuna * unitPrice;
+      const pagesEquiv = cmColuna / NEWSPAPER_CM_COL_PER_PAGE;
+
+      return {
+        linesPrinted: tableChunks.reduce((s, c) => s + c.totalTr, 0),
+        columns: NEWSPAPER_COLUMNS,
+        cmPerLine: NEWSPAPER_CM_PER_LINE,
+        heightExact,
+        heightBilled,
+        cmColuna,
+        pagesEquiv,
+        unitPrice,
+        cost,
+        monthlyCmColuna: cmColuna * freq,
+        monthlyCost: cost * freq,
+        monthlyPages: pagesEquiv * freq,
+      };
+    }
+
+    function estimateBytePricing(tableChunks, freq, priceByte) {
+      // HTML tratado = texto introdutório + todas as tabelas geradas (UTF-8)
+      const tablesBytes = tableChunks.reduce((sum, chunk) => sum + chunk.bytes, 0);
+      const introBytes = utf8Bytes(INTRO_HTML);
+      const totalBytes = introBytes + tablesBytes;
+      const unitPrice = priceByte;
+      const cost = totalBytes * unitPrice;
+
+      return {
+        introBytes,
+        tablesBytes,
+        totalBytes,
+        unitPrice,
+        cost,
+        monthlyBytes: totalBytes * freq,
+        monthlyCost: cost * freq,
+      };
+    }
+
+    function recommendPrepaid(needed) {
+      if (needed <= 0) {
+        return { packages: [], totalCost: 0, totalCredits: 0, leftover: 0, strategy: "—", label: "—" };
+      }
+
+      const single = PRE_PACKAGES.find((p) => p.requests >= needed);
+      if (single) {
+        return {
+          strategy: "pacote único",
+          packages: [{ ...single, qty: 1 }],
+          totalCost: single.price,
+          totalCredits: single.requests,
+          leftover: single.requests - needed,
+          label: `1× ${single.requests.toLocaleString("pt-BR")}`,
+        };
+      }
+
+      const largest = PRE_PACKAGES[PRE_PACKAGES.length - 1];
+      const fullQty = Math.floor(needed / largest.requests);
+      let remaining = needed - fullQty * largest.requests;
+      const packages = [];
+      if (fullQty > 0) packages.push({ ...largest, qty: fullQty });
+
+      if (remaining > 0) {
+        const cover = PRE_PACKAGES.find((p) => p.requests >= remaining) || largest;
+        const existing = packages.find((p) => p.requests === cover.requests);
+        if (existing) existing.qty += 1;
+        else packages.push({ ...cover, qty: 1 });
+      }
+
+      const totalCredits = packages.reduce((s, p) => s + p.requests * p.qty, 0);
+      const totalCost = packages.reduce((s, p) => s + p.price * p.qty, 0);
+      return {
+        strategy: "combinação de pacotes",
+        packages,
+        totalCost,
+        totalCredits,
+        leftover: totalCredits - needed,
+        label: packages.map((p) => `${p.qty}× ${p.requests.toLocaleString("pt-BR")}`).join(" + "),
+      };
+    }
+
+    function formatPackagesLabel(pre) {
+      if (!pre?.packages?.length) return "—";
+      return pre.packages.map((p) => `${p.qty}× ${p.requests.toLocaleString("pt-BR")}`).join(" + ");
+    }
+
+    function normalizeUsageRows(rawRows) {
+      return rawRows
+        .map((r) => ({
+          ano: Number(r.ano ?? r.Ano ?? r.year),
+          mes: Number(r.mes ?? r.Mes ?? r.month),
+          origem: String(r.origem ?? r.Origem ?? r.cliente ?? r.Cliente ?? "").trim(),
+          qtde: Number(r.qtde ?? r.Qtde ?? r.quantidade ?? r.Quantidade ?? r.requests ?? 0),
+        }))
+        .filter((r) => r.origem && Number.isFinite(r.mes) && Number.isFinite(r.qtde) && r.qtde > 0);
+    }
+
+    function calcPostpaidForQty(qty) {
+      const tier = getPosTier(qty);
+      return { tier, unit: tier.price, total: qty * tier.price };
+    }
+
+    function calculateRevenueFromUsage(rows) {
+      const byClient = new Map();
+
+      rows.forEach((row) => {
+        if (!byClient.has(row.origem)) {
+          byClient.set(row.origem, { origem: row.origem, months: [] });
+        }
+        const client = byClient.get(row.origem);
+        const pos = calcPostpaidForQty(row.qtde);
+        const pre = recommendPrepaid(row.qtde);
+        client.months.push({
+          ano: row.ano,
+          mes: row.mes,
+          qtde: row.qtde,
+          pos,
+          pre,
+        });
+      });
+
+      const clients = [...byClient.values()]
+        .map((client) => {
+          client.months.sort((a, b) => a.ano - b.ano || a.mes - b.mes);
+          const totalReq = client.months.reduce((s, m) => s + m.qtde, 0);
+          const totalPos = client.months.reduce((s, m) => s + m.pos.total, 0);
+          const totalPre = client.months.reduce((s, m) => s + m.pre.totalCost, 0);
+          return {
+            ...client,
+            totalReq,
+            totalPos,
+            totalPre,
+            monthCount: client.months.length,
+            diff: totalPre - totalPos,
+          };
+        })
+        .sort((a, b) => b.totalReq - a.totalReq);
+
+      const totalReq = clients.reduce((s, c) => s + c.totalReq, 0);
+      const totalPos = clients.reduce((s, c) => s + c.totalPos, 0);
+      const totalPre = clients.reduce((s, c) => s + c.totalPre, 0);
+      const months = [...new Set(rows.map((r) => `${r.ano}-${r.mes}`))].sort();
+
+      return {
+        clients,
+        totalReq,
+        totalPos,
+        totalPre,
+        clientCount: clients.length,
+        months,
+        sourceName: usageSourceName,
+      };
+    }
+
+    function renderRevenue(result) {
+      lastRevenueResult = result;
+      calcResultsPanel.hidden = false;
+
+      document.getElementById("metricsCalc").innerHTML = [
+        { label: "Fonte", value: result.clientCount.toLocaleString("pt-BR") + " clientes", sub: result.sourceName },
+        { label: "Período", value: `${result.months.length} meses`, sub: result.months.map((m) => m.split("-")[1] + "/" + m.split("-")[0]).join(", ") },
+        { label: "Requisições", value: result.totalReq.toLocaleString("pt-BR"), sub: "soma do relatório" },
+        { label: "Diferença pré − pós", value: money(result.totalPre - result.totalPos), sub: result.totalPre >= result.totalPos ? "pré-pago maior" : "pós-pago maior" },
+      ]
+        .map((m) => `<div class="metric"><div class="label">${m.label}</div><div class="value">${m.value}</div><div class="sub">${m.sub}</div></div>`)
+        .join("");
+
+      document.getElementById("totalPosRevenue").textContent = money(result.totalPos);
+      document.getElementById("totalPreRevenue").textContent = money(result.totalPre);
+      document.getElementById("posHint").textContent = `Total arrecadado estimado: ${money(result.totalPos)}`;
+      document.getElementById("preHint").textContent = `Total arrecadado estimado: ${money(result.totalPre)}`;
+
+      const body = document.getElementById("revenueByClientBody");
+      body.innerHTML =
+        result.clients
+          .map(
+            (c) => `<tr class="client-row" data-origem="${encodeURIComponent(c.origem)}" aria-expanded="false">
+              <td>
+                <span class="client-name">
+                  <span class="chev">▶</span>
+                  <strong>${c.origem}</strong>
+                </span>
+              </td>
+              <td>${c.monthCount}</td>
+              <td class="num">${c.totalReq.toLocaleString("pt-BR")}</td>
+              <td class="num">${money(c.totalPos)}</td>
+              <td class="num">${money(c.totalPre)}</td>
+              <td class="num">${money(c.diff)}</td>
+            </tr>`
+          )
+          .join("") +
+        `<tr class="total">
+          <td>TOTAL</td>
+          <td>${result.months.length}</td>
+          <td class="num">${result.totalReq.toLocaleString("pt-BR")}</td>
+          <td class="num">${money(result.totalPos)}</td>
+          <td class="num">${money(result.totalPre)}</td>
+          <td class="num">${money(result.totalPre - result.totalPos)}</td>
+        </tr>`;
+
+      body.querySelectorAll("tr.client-row").forEach((tr) => {
+        tr.addEventListener("click", () => toggleClientMonths(tr, result));
+      });
+    }
+
+    function buildMonthDetailRows(client) {
+      const monthRows = client.months
+        .map(
+          (m) => `<tr class="month-row" data-parent="${encodeURIComponent(client.origem)}">
+            <td>${String(m.mes).padStart(2, "0")}/${m.ano}</td>
+            <td>—</td>
+            <td class="num">${m.qtde.toLocaleString("pt-BR")}</td>
+            <td class="num">
+              ${money(m.pos.total)}
+              <div style="font-size:0.75rem;color:var(--muted);font-weight:500">${m.pos.tier.label} · ${money(m.pos.unit)}/req</div>
+            </td>
+            <td class="num">
+              ${money(m.pre.totalCost)}
+              <div style="font-size:0.75rem;color:var(--muted);font-weight:500">${formatPackagesLabel(m.pre)}</div>
+            </td>
+            <td class="num">${money(m.pre.totalCost - m.pos.total)}</td>
+          </tr>`
+        )
+        .join("");
+
+      const totalRow = `<tr class="month-total" data-parent="${encodeURIComponent(client.origem)}">
+        <td>Subtotal ${client.origem}</td>
+        <td>${client.monthCount} meses</td>
+        <td class="num">${client.totalReq.toLocaleString("pt-BR")}</td>
+        <td class="num">${money(client.totalPos)}</td>
+        <td class="num">${money(client.totalPre)}</td>
+        <td class="num">${money(client.diff)}</td>
+      </tr>`;
+
+      return monthRows + totalRow;
+    }
+
+    function collapseAllClientMonths(exceptTr = null) {
+      const body = document.getElementById("revenueByClientBody");
+      body.querySelectorAll("tr.client-row.open").forEach((tr) => {
+        if (exceptTr && tr === exceptTr) return;
+        tr.classList.remove("open");
+        tr.setAttribute("aria-expanded", "false");
+      });
+      body.querySelectorAll("tr.month-row, tr.month-total").forEach((tr) => {
+        if (exceptTr && tr.getAttribute("data-parent") === exceptTr.getAttribute("data-origem")) return;
+        tr.remove();
+      });
+    }
+
+    function toggleClientMonths(tr, result) {
+      const origem = decodeURIComponent(tr.getAttribute("data-origem"));
+      const client = result.clients.find((c) => c.origem === origem);
+      if (!client) return;
+
+      const isOpen = tr.classList.contains("open");
+      collapseAllClientMonths();
+
+      if (isOpen) return;
+
+      tr.classList.add("open");
+      tr.setAttribute("aria-expanded", "true");
+      tr.insertAdjacentHTML("afterend", buildMonthDetailRows(client));
+      tr.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    function runRevenueCalculation() {
+      const rows = normalizeUsageRows(usageRows);
+      if (!rows.length) {
+        setStatus("error", "Nenhuma linha válida encontrada no relatório (Ano, Mes, Origem, Qtde).", "calculadora");
+        calcResultsPanel.hidden = true;
+        return;
+      }
+      const result = calculateRevenueFromUsage(rows);
+      renderRevenue(result);
+      setStatus(
+        "ok",
+        `Faturamento calculado: ${result.clientCount} clientes · ${result.totalReq.toLocaleString("pt-BR")} req · pós ${money(result.totalPos)} · pré ${money(result.totalPre)}.`,
+        "calculadora"
+      );
+    }
+
+    function parseReportFile(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("Falha ao ler o arquivo."));
+        reader.onload = (e) => {
+          try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: "array" });
+            const sheetName =
+              workbook.SheetNames.find((n) => /mensal.*cliente/i.test(n)) || workbook.SheetNames[0];
+            const sheet = workbook.Sheets[sheetName];
+            const json = XLSX.utils.sheet_to_json(sheet, { defval: null });
+            const rows = normalizeUsageRows(json);
+            if (!rows.length) throw new Error("Planilha sem dados válidos na aba de clientes.");
+            resolve({ rows, sheetName });
+          } catch (err) {
+            reject(err);
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      });
+    }
+
+    function buildClientMessage(ctx) {
+      const {
+        fileName,
+        dataRows,
+        tableChunks,
+        freq,
+        reqPerFile,
+        monthlyReq,
+        posFile,
+        posMonth,
+        preMonth,
+        newspaper,
+        bytePricing,
+      } = ctx;
+
+      const lines = [];
+
+      lines.push(`Seu arquivo “${fileName}” foi analisado com sucesso.`);
+      lines.push("");
+      lines.push(
+        `Identificamos ${dataRows.length.toLocaleString("pt-BR")} registros em formato tabular. Para respeitar o limite técnico de ${LIMIT_KB} KB por chamada, o conteúdo será organizado em ${tableChunks.length} tabela(s) e processado em ${reqPerFile} requisição(ões) pela API.`
+      );
+
+      if (reqPerFile > 1) {
+        lines.push("");
+        lines.push(
+          "Isso é o comportamento esperado para arquivos volumosos: a divisão é automática e necessária para evitar timeout no endpoint."
+        );
+      }
+
+      lines.push("");
+      lines.push(
+        `Custo estimado desta execução (pós-pago): ${money(posFile.total)} (${reqPerFile} × ${money(posFile.unit)} — ${posFile.tier.label}).`
+      );
+
+      lines.push("");
+      lines.push(
+        `Se a mesma matéria fosse publicada em jornal (folha), ocuparia cerca de ${newspaper.heightBilled.toLocaleString("pt-BR")} cm de altura em ${newspaper.columns} colunas, totalizando ${newspaper.cmColuna.toLocaleString("pt-BR")} cm×coluna — equivalente a aproximadamente ${newspaper.pagesEquiv.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} página(s) de ${NEWSPAPER_PAGE_HEIGHT_CM} cm.`
+      );
+      lines.push(
+        `No valor de ${money(newspaper.unitPrice)} por cm×coluna, o custo estimado da publicação impressa seria ${money(newspaper.cost)}.`
+      );
+
+      lines.push("");
+      lines.push(
+        `Pelo tamanho do HTML tratado (${formatBytes(bytePricing.totalBytes)} / ${bytePricing.totalBytes.toLocaleString("pt-BR")} bytes), com cobrança de ${money(bytePricing.unitPrice)} por byte, o custo estimado da publicação seria ${money(bytePricing.cost)}.`
+      );
+
+      if (freq > 1) {
+        lines.push("");
+        lines.push(
+          `Com a frequência informada (${freq} envio(s) por mês), a expectativa de consumo da API é de cerca de ${monthlyReq.toLocaleString("pt-BR")} requisições/mês.`
+        );
+        lines.push(
+          `No pós-pago, o valor mensal estimado da API é ${money(posMonth.total)} (${posMonth.tier.label}).`
+        );
+        const pkgTxt = preMonth.packages
+          .map((p) => `${p.qty}× pacote de ${p.requests.toLocaleString("pt-BR")} requisições`)
+          .join(" + ");
+        lines.push(
+          `No pré-pago, a sugestão é ${pkgTxt}, no valor de ${money(preMonth.totalCost)}, com sobra de ${preMonth.leftover.toLocaleString("pt-BR")} crédito(s).`
+        );
+        lines.push(
+          `Na publicação em jornal, o custo mensal estimado seria ${money(newspaper.monthlyCost)} (~${newspaper.monthlyPages.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} páginas/mês).`
+        );
+        lines.push(
+          `Na cobrança por byte do HTML tratado, o custo mensal estimado seria ${money(bytePricing.monthlyCost)}.`
+        );
+      }
+
+      return lines.join("\n");
+    }
+
+    function renderMetrics(ctx) {
+      const items = [
+        { label: "Arquivo", value: formatBytes(ctx.fileBytes), sub: ctx.fileName },
+        { label: "Linhas de dados", value: ctx.dataRows.length.toLocaleString("pt-BR"), sub: `${ctx.header.length} colunas` },
+        { label: "Requisições / arquivo", value: String(ctx.reqPerFile), sub: `${ctx.tableChunks.length} tabelas · limite ${LIMIT_KB} KB` },
+        {
+          label: "Espaço no jornal",
+          value: `${ctx.newspaper.cmColuna.toLocaleString("pt-BR")} cm×col`,
+          sub: `~${ctx.newspaper.pagesEquiv.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} pág. · ${money(ctx.newspaper.cost)}`,
+        },
+        {
+          label: "HTML tratado",
+          value: formatBytes(ctx.bytePricing.totalBytes),
+          sub: `${ctx.bytePricing.totalBytes.toLocaleString("pt-BR")} bytes`,
+        },
+        { label: "Custo por byte", value: money(ctx.bytePricing.cost), sub: `${money(ctx.bytePricing.unitPrice)} / byte` },
+      ];
+
+      document.getElementById("metrics").innerHTML = items
+        .map(
+          (m) => `<div class="metric"><div class="label">${m.label}</div><div class="value">${m.value}</div><div class="sub">${m.sub}</div></div>`
+        )
+        .join("");
+    }
+
+    function renderBatches(ctx) {
+      const requests = ctx.requests || [];
+      const downloadAllBtn = document.getElementById("downloadAllBatchesBtn");
+      if (batchesSection) batchesSection.hidden = requests.length === 0;
+      downloadAllBtn.hidden = requests.length === 0;
+
+      document.getElementById("batchesBody").innerHTML = requests
+        .map((r) => {
+          const fileName = buildBatchFileName(ctx.fileName, r.id);
+          return `<tr>
+            <td>#${r.id}</td>
+            <td>${r.tableCount} <span style="color:var(--muted)">(nº ${r.tableIndexes.join(", ")})</span></td>
+            <td>${r.totalTr.toLocaleString("pt-BR")}</td>
+            <td>${formatBytes(r.bytes)}</td>
+            <td style="color:${r.overLimit ? "var(--danger)" : "var(--ok)"};font-weight:600">${r.overLimit ? "Acima do limite" : "OK"}</td>
+            <td>
+              <button type="button" class="btn-dl" data-batch-id="${r.id}" title="${fileName}">Baixar HTML</button>
+            </td>
+          </tr>`;
+        })
+        .join("");
+
+      document.querySelectorAll("#batchesBody [data-batch-id]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = Number(btn.getAttribute("data-batch-id"));
+          const req = (lastResult?.requests || []).find((r) => r.id === id);
+          if (!req?.payload) return;
+          downloadTextFile(buildBatchFileName(lastResult.fileName, req.id), req.payload);
+        });
+      });
+    }
+
+    function renderPricing(ctx) {
+      // Pós
+      document.getElementById("tablePos").innerHTML = `
+        <thead><tr><th>Faixa de consumo</th><th>Preço por requisição</th></tr></thead>
+        <tbody>
+          ${POS_TIERS.map((t) => {
+            const hl = ctx.posMonth.tier === t ? " class=\"hl\"" : "";
+            return `<tr${hl}><td>${t.label}</td><td>${money(t.price)}</td></tr>`;
+          }).join("")}
+        </tbody>`;
+
+      document.getElementById("costPos").innerHTML = `
+        <div class="title">Pós-pago — pague apenas pelo que usar</div>
+        <div class="big">${money(ctx.posMonth.total)}</div>
+        <ul>
+          <li>Por arquivo: ${ctx.reqPerFile} req × ${money(ctx.posFile.unit)} = ${money(ctx.posFile.total)}</li>
+          <li>Projeção mensal: ${ctx.monthlyReq.toLocaleString("pt-BR")} req × ${money(ctx.posMonth.unit)} = ${money(ctx.posMonth.total)}</li>
+          <li>Faixa aplicada no mês: ${ctx.posMonth.tier.label}</li>
+          <li>Modelo flexível, sem pacote antecipado</li>
+        </ul>`;
+
+      // Pré
+      document.getElementById("tablePre").innerHTML = `
+        <thead><tr><th>Pacote</th><th>Preço por pacote</th><th>Custo unitário</th></tr></thead>
+        <tbody>
+          ${PRE_PACKAGES.map((p) => {
+            const used = ctx.preMonth.packages.some((x) => x.requests === p.requests);
+            const hl = used ? " class=\"hl\"" : "";
+            return `<tr${hl}><td>${p.requests.toLocaleString("pt-BR")} requisições</td><td>${money(p.price)}</td><td>${money(p.price / p.requests)}</td></tr>`;
+          }).join("")}
+        </tbody>`;
+
+      const pkgTxt = ctx.preMonth.packages
+        .map((p) => `${p.qty}× pacote de ${p.requests.toLocaleString("pt-BR")} (${money(p.price * p.qty)})`)
+        .join(", ");
+
+      document.getElementById("costPre").innerHTML = `
+        <div class="title">Pré-pago — sugestão para o consumo mensal</div>
+        <div class="big">${money(ctx.preMonth.totalCost)}</div>
+        <ul>
+          <li>Estratégia: ${ctx.preMonth.strategy}</li>
+          <li>Comprar: ${pkgTxt || "—"}</li>
+          <li>Créditos totais: ${ctx.preMonth.totalCredits.toLocaleString("pt-BR")} · Necessário: ${ctx.monthlyReq.toLocaleString("pt-BR")} · Sobra: ${ctx.preMonth.leftover.toLocaleString("pt-BR")}</li>
+          <li>Custo efetivo aproximado: ${money(ctx.preMonth.totalCost / Math.max(ctx.monthlyReq, 1))} / requisição</li>
+        </ul>`;
+
+      document.getElementById("costJornal").innerHTML = `
+        <div class="title">Publicação em jornal — cm × coluna</div>
+        <div class="big">${money(ctx.newspaper.cost)}</div>
+        <ul>
+          <li>Preço unitário: ${money(ctx.newspaper.unitPrice)} por cm×coluna</li>
+          <li>Largura assumida: ${ctx.newspaper.columns} colunas (25,2 cm — tabela completa)</li>
+          <li>Linhas impressas: ${ctx.newspaper.linesPrinted.toLocaleString("pt-BR")} (dados + cabeçalhos das ${ctx.tableChunks.length} tabelas)</li>
+          <li>Altura estimada: ${ctx.newspaper.heightExact.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} cm → cobrada ${ctx.newspaper.heightBilled.toLocaleString("pt-BR")} cm</li>
+          <li>Espaço total: <strong>${ctx.newspaper.cmColuna.toLocaleString("pt-BR")} cm×coluna</strong></li>
+          <li>Equivalente em folha: ~${ctx.newspaper.pagesEquiv.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} página(s) de ${NEWSPAPER_PAGE_HEIGHT_CM} cm × ${NEWSPAPER_COLUMNS} colunas</li>
+          <li>Projeção mensal (${ctx.freq} envio(s)): ${money(ctx.newspaper.monthlyCost)} (~${ctx.newspaper.monthlyPages.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} páginas)</li>
+          <li class="hint" style="list-style:none;margin-left:-1.1rem;margin-top:0.4rem">Critério: entrelinha mínima de ${NEWSPAPER_LEADING_PT} pt (≈ ${NEWSPAPER_CM_PER_LINE.toLocaleString("pt-BR", { maximumFractionDigits: 3 })} cm/linha) e arredondamento de fração de cm para cima.</li>
+        </ul>`;
+
+      document.getElementById("costByte").innerHTML = `
+        <div class="title">Publicação por tamanho do HTML tratado</div>
+        <div class="big">${money(ctx.bytePricing.cost)}</div>
+        <ul>
+          <li>Preço unitário: ${money(ctx.bytePricing.unitPrice)} por byte</li>
+          <li>Introdução HTML: ${ctx.bytePricing.introBytes.toLocaleString("pt-BR")} bytes</li>
+          <li>Tabelas geradas: ${ctx.bytePricing.tablesBytes.toLocaleString("pt-BR")} bytes</li>
+          <li>HTML tratado total: <strong>${ctx.bytePricing.totalBytes.toLocaleString("pt-BR")} bytes</strong> (${formatBytes(ctx.bytePricing.totalBytes)})</li>
+          <li>Cálculo: ${ctx.bytePricing.totalBytes.toLocaleString("pt-BR")} × ${money(ctx.bytePricing.unitPrice)} = ${money(ctx.bytePricing.cost)}</li>
+          <li>Projeção mensal (${ctx.freq} envio(s)): ${money(ctx.bytePricing.monthlyCost)} (${ctx.bytePricing.monthlyBytes.toLocaleString("pt-BR")} bytes)</li>
+        </ul>`;
+
+      const diff = ctx.preMonth.totalCost - ctx.posMonth.total;
+      const better =
+        diff > 0
+          ? `Neste cenário, o pós-pago fica ${money(Math.abs(diff))} mais econômico no mês.`
+          : diff < 0
+            ? `Neste cenário, o pré-pago fica ${money(Math.abs(diff))} mais econômico no mês (já incluindo a sobra de créditos).`
+            : "Neste cenário, pré e pós ficam equivalentes no mês.";
+
+      const saveVsPaper = ctx.newspaper.monthlyCost - ctx.posMonth.total;
+      const saveVsByte = ctx.bytePricing.monthlyCost - ctx.posMonth.total;
+
+      document.getElementById("costCmp").innerHTML = `
+        <div class="title">Comparativo do mês estimado</div>
+        <ul>
+          <li><strong>API pós-pago:</strong> ${money(ctx.posMonth.total)} (${ctx.monthlyReq} req)</li>
+          <li><strong>API pré-pago:</strong> ${money(ctx.preMonth.totalCost)} (${ctx.preMonth.totalCredits} créditos)</li>
+          <li><strong>Jornal (cm×coluna):</strong> ${money(ctx.newspaper.monthlyCost)} (${ctx.newspaper.monthlyCmColuna.toLocaleString("pt-BR")} cm×col)</li>
+          <li><strong>HTML (byte):</strong> ${money(ctx.bytePricing.monthlyCost)} (${ctx.bytePricing.monthlyBytes.toLocaleString("pt-BR")} bytes)</li>
+          <li><strong>Leitura API:</strong> ${better}</li>
+          <li><strong>Frente ao jornal:</strong> a API pós-pago fica cerca de ${money(Math.max(saveVsPaper, 0))} mais econômica no mês.</li>
+          <li><strong>Frente ao byte:</strong> a API pós-pago fica cerca de ${money(Math.max(saveVsByte, 0))} mais econômica no mês.</li>
+        </ul>`;
+    }
+
+    function applyResultToUI(ctx, { showModal = false } = {}) {
+      lastResult = ctx;
+      lastApiMessage = buildClientMessage(ctx);
+      showMessageBtn.hidden = false;
+      if (showModal) openMessageModal(lastApiMessage);
+      else apiMessage.textContent = lastApiMessage;
+      renderMetrics(ctx);
+      renderBatches(ctx);
+      renderPricing(ctx);
+      resultsPanel.hidden = false;
+    }
+
+    function recalculateSimulation({ showModal = false } = {}) {
+      if (!lastResult) return;
+
+      const freq = Number(frequencyEl.value) || 1;
+      const { priceCmCol, priceByte } = getSimulationPrices();
+      const reqPerFile = lastResult.reqPerFile;
+      const monthlyReq = reqPerFile * freq;
+
+      const posFileTier = getPosTier(reqPerFile);
+      const posMonthTier = getPosTier(monthlyReq);
+
+      const ctx = {
+        ...lastResult,
+        freq,
+        monthlyReq,
+        posFile: { tier: posFileTier, unit: posFileTier.price, total: reqPerFile * posFileTier.price },
+        posMonth: { tier: posMonthTier, unit: posMonthTier.price, total: monthlyReq * posMonthTier.price },
+        preMonth: recommendPrepaid(monthlyReq),
+        newspaper: estimateNewspaper(lastResult.tableChunks, freq, priceCmCol),
+        bytePricing: estimateBytePricing(lastResult.tableChunks, freq, priceByte),
+      };
+
+      applyResultToUI(ctx, { showModal });
+      setStatus(
+        "info",
+        `Simulação atualizada: cm×coluna = ${money(priceCmCol)} · byte = ${money(priceByte)}.`
+      );
+    }
+
+    async function analyzeFile(file, { showModal = true } = {}) {
+      setStatus("info", "Lendo e analisando o DOCX… isso pode levar alguns segundos em arquivos grandes.", "consumo");
+      analyzeBtn.disabled = true;
+      resultsPanel.hidden = true;
+      if (batchesSection) batchesSection.hidden = true;
+
+      try {
+        const fileBytes = file.size;
+        const zip = await JSZip.loadAsync(file);
+        const docEntry = zip.file("word/document.xml");
+        if (!docEntry) throw new Error("DOCX inválido: word/document.xml não encontrado.");
+
+        const xmlText = await docEntry.async("string");
+        const rawTables = extractTablesFromDocxXml(xmlText);
+        if (!rawTables.length) {
+          throw new Error("Nenhuma tabela foi encontrada neste DOCX. A API espera conteúdo tabular.");
+        }
+
+        const { header, dataRows } = normalizeTables(rawTables);
+        if (!dataRows.length) {
+          throw new Error("A tabela foi encontrada, mas não há linhas de dados para processar.");
+        }
+
+        const tableChunks = splitIntoApiTables(header, dataRows);
+        const requests = packRequests(tableChunks);
+        const freq = Number(frequencyEl.value) || 1;
+        const reqPerFile = Math.max(requests.length, 1);
+        const monthlyReq = reqPerFile * freq;
+        const { priceCmCol, priceByte } = getSimulationPrices();
+
+        const posFileTier = getPosTier(reqPerFile);
+        const posMonthTier = getPosTier(monthlyReq);
+        const posFile = { tier: posFileTier, unit: posFileTier.price, total: reqPerFile * posFileTier.price };
+        const posMonth = { tier: posMonthTier, unit: posMonthTier.price, total: monthlyReq * posMonthTier.price };
+        const preMonth = recommendPrepaid(monthlyReq);
+        const newspaper = estimateNewspaper(tableChunks, freq, priceCmCol);
+        const bytePricing = estimateBytePricing(tableChunks, freq, priceByte);
+
+        const ctx = {
+          fileName: file.name,
+          fileBytes,
+          header,
+          dataRows,
+          tableChunks,
+          requests,
+          freq,
+          reqPerFile,
+          monthlyReq,
+          posFile,
+          posMonth,
+          preMonth,
+          newspaper,
+          bytePricing,
+        };
+
+        applyResultToUI(ctx, { showModal });
+
+        setStatus(
+          "ok",
+          `Análise concluída: ${dataRows.length.toLocaleString("pt-BR")} linhas → ${tableChunks.length} tabelas → ${reqPerFile} requisição(ões).`,
+          "consumo"
+        );
+      } catch (err) {
+        console.error(err);
+        showMessageBtn.hidden = true;
+        lastApiMessage = "";
+        resultsPanel.hidden = true;
+        if (batchesSection) batchesSection.hidden = true;
+        closeMessageModal();
+        setStatus("error", err.message || "Erro ao analisar o arquivo.", "consumo");
+      } finally {
+        syncAnalyzeButtons();
+      }
+    }
+
+    function resetUI() {
+      selectedFile = null;
+      lastResult = null;
+      lastApiMessage = "";
+      fileInput.value = "";
+      syncAnalyzeButtons();
+      showMessageBtn.hidden = true;
+      resultsPanel.hidden = true;
+      if (batchesSection) batchesSection.hidden = true;
+      const downloadAllBtn = document.getElementById("downloadAllBatchesBtn");
+      if (downloadAllBtn) downloadAllBtn.hidden = true;
+      clearStatus();
+      closeMessageModal();
+      apiMessage.textContent = "";
+    }
+
+    function acceptFile(file) {
+      if (!file) return;
+      const name = (file.name || "").toLowerCase();
+      if (!name.endsWith(".docx")) {
+        setStatus("error", "Envie um arquivo no formato .docx.", "consumo");
+        return;
+      }
+      selectedFile = file;
+      syncAnalyzeButtons();
+      setStatus("info", `Arquivo selecionado: ${file.name} (${formatBytes(file.size)}). Clique em analisar.`, "consumo");
+    }
+
+    function bindDropzone(zone, input, onFile) {
+      zone.addEventListener("click", () => input.click());
+      zone.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") input.click();
+      });
+      input.addEventListener("change", () => onFile(input.files[0]));
+      ["dragenter", "dragover"].forEach((ev) => {
+        zone.addEventListener(ev, (e) => {
+          e.preventDefault();
+          zone.classList.add("dragover");
+        });
+      });
+      ["dragleave", "drop"].forEach((ev) => {
+        zone.addEventListener(ev, (e) => {
+          e.preventDefault();
+          zone.classList.remove("dragover");
+        });
+      });
+      zone.addEventListener("drop", (e) => {
+        onFile(e.dataTransfer.files[0]);
+      });
+    }
+
+    bindDropzone(dropzone, fileInput, acceptFile);
+    bindDropzone(dropzoneReport, fileInputReport, async (file) => {
+      if (!file) return;
+      try {
+        setStatus("info", `Lendo relatório ${file.name}…`, "calculadora");
+        const parsed = await parseReportFile(file);
+        usageRows = parsed.rows;
+        usageSourceName = `${file.name} (${parsed.sheetName})`;
+        runRevenueCalculation();
+      } catch (err) {
+        console.error(err);
+        setStatus("error", err.message || "Erro ao ler a planilha.", "calculadora");
+      }
+    });
+
+    analyzeBtn.addEventListener("click", () => {
+      if (selectedFile) analyzeFile(selectedFile, { showModal: true });
+    });
+    clearBtn.addEventListener("click", resetUI);
+    closeModalBtn.addEventListener("click", closeMessageModal);
+    showMessageBtn.addEventListener("click", () => openMessageModal());
+    calcRevenueBtn.addEventListener("click", () => runRevenueCalculation());
+    reloadDefaultReportBtn.addEventListener("click", () => {
+      usageRows = [...DEFAULT_USAGE_REPORT.linhas];
+      usageSourceName = DEFAULT_USAGE_REPORT.fonte;
+      fileInputReport.value = "";
+      runRevenueCalculation();
+    });
+    document.getElementById("downloadAllBatchesBtn").addEventListener("click", async () => {
+      if (!lastResult?.requests?.length) return;
+      const btn = document.getElementById("downloadAllBatchesBtn");
+      btn.disabled = true;
+      try {
+        await downloadAllBatchFiles(lastResult);
+        setStatus("ok", `ZIP gerado com ${lastResult.requests.length} lote(s) para avaliação.`, "consumo");
+      } catch (err) {
+        console.error(err);
+        setStatus("error", "Não foi possível gerar o ZIP dos lotes.", "consumo");
+      } finally {
+        btn.disabled = false;
+      }
+    });
+    messageModal.addEventListener("click", (e) => {
+      if (e.target === messageModal) closeMessageModal();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && messageModal.classList.contains("open")) {
+        closeMessageModal();
+      }
+    });
+
+    document.querySelectorAll(".app-nav button").forEach((btn) => {
+      btn.addEventListener("click", () => switchAppTab(btn.dataset.appTab));
+    });
+
+    frequencyEl.addEventListener("change", () => {
+      recalculateSimulation({ showModal: false });
+    });
+
+    function onSimulationPriceChange() {
+      recalculateSimulation({ showModal: false });
+    }
+
+    ["input", "change"].forEach((ev) => {
+      priceCmColEl.addEventListener(ev, onSimulationPriceChange);
+      priceByteEl.addEventListener(ev, onSimulationPriceChange);
+    });
+
+    resetPricesBtn.addEventListener("click", () => {
+      setSimulationPrices(DEFAULT_PRICE_CM_COL, DEFAULT_PRICE_BYTE);
+      recalculateSimulation({ showModal: false });
+      if (!lastResult) {
+        setStatus("info", `Valores padrão restaurados: cm×coluna = ${money(DEFAULT_PRICE_CM_COL)} · byte = ${money(DEFAULT_PRICE_BYTE)}.`, "consumo");
+      }
+    });
+
+    document.querySelectorAll("#view-consumo .tabs button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#view-consumo .tabs button").forEach((b) => b.classList.remove("active"));
+        document.querySelectorAll("#view-consumo .price-view").forEach((v) => v.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById(`view-${btn.dataset.tab}`).classList.add("active");
+      });
+    });
+
+    // Carrega o relatório padrão ao abrir
+    runRevenueCalculation();
+  </script>
+</body>
+</html>
